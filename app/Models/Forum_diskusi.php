@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Forum_diskusi extends Model
+{
+    use HasFactory;
+    protected $fillable = ['kelas_id', 'judul', 'isi', 'user_id'];
+    public function kelas()
+    {
+        return $this->belongsTo(Kelas::class);
+    }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+    public function komentar()
+    {
+        return $this->hasMany(Komentar_forum::class, 'forum_id');
+    }
+}
