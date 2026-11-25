@@ -9,6 +9,7 @@ use App\Models\Pengajaran;
 use App\Models\TahunAjaran;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -33,7 +34,7 @@ class PenugasanGuruManager extends Component
     {
         $id = Auth::user()
             ->userRoles()
-            ->whereHas('role', fn ($q) => $q->where('nama_role', 'admin'))
+            ->whereHas('role', fn($q) => $q->where('nama_role', 'admin'))
             ->value('sekolah_id');
 
         abort_unless($id, 403, 'Sekolah Admin tidak ditemukan.');
@@ -45,7 +46,7 @@ class PenugasanGuruManager extends Component
     {
         return Pengajaran::query()->whereHas(
             'kelas',
-            fn ($q) => $q->where('sekolah_id', $this->sekolahId())
+            fn($q) => $q->where('sekolah_id', $this->sekolahId())
         );
     }
 
@@ -146,7 +147,7 @@ class PenugasanGuruManager extends Component
             ->where('tahun_ajaran_id', $data['tahun_ajaran_id'])
             ->when(
                 $this->pengajaranId,
-                fn ($q) => $q->where('id', '!=', $this->pengajaranId)
+                fn($q) => $q->where('id', '!=', $this->pengajaranId)
             )
             ->exists();
 
@@ -178,14 +179,39 @@ class PenugasanGuruManager extends Component
         session()->flash('success', 'Status penugasan berhasil diperbarui.');
     }
 
+    protected function hasRelatedRecords(Pengajaran $item): bool
+    {
+        $tables = [
+            'materis',
+            'ujians',
+            'tugas',
+            'kuis',
+            'nilais',
+            'jadwals',
+            'jadwal_pelajarans',
+        ];
+
+        foreach ($tables as $table) {
+            if (
+                Schema::hasTable($table)
+                && Schema::hasColumn($table, 'pengajaran_id')
+                && DB::table($table)->where('pengajaran_id', $item->id)->exists()
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function delete(int $id): void
     {
         $item = $this->queryPenugasan()->findOrFail($id);
 
-        if ($item->materis()->exists() || $item->ujians()->exists()) {
+        if ($this->hasRelatedRecords($item)) {
             session()->flash(
                 'error',
-                'Penugasan tidak dapat dihapus karena sudah memiliki materi atau ujian.'
+                'Penugasan tidak dapat dihapus karena sudah digunakan pada materi, ujian, tugas, nilai, atau jadwal.'
             );
 
             return;
@@ -206,13 +232,21 @@ class PenugasanGuruManager extends Component
                 $search = '%' . $this->search . '%';
 
                 $q->where(function ($sub) use ($search) {
-                    $sub->whereHas('guru', fn ($r) =>
+                    $sub->whereHas(
+                        'guru',
+                        fn($r) =>
                         $r->where('nama_lengkap', 'like', $search)
-                    )->orWhereHas('mataPelajaran', fn ($r) =>
+                    )->orWhereHas(
+                        'mataPelajaran',
+                        fn($r) =>
                         $r->where('nama', 'like', $search)
-                    )->orWhereHas('kelas', fn ($r) =>
+                    )->orWhereHas(
+                        'kelas',
+                        fn($r) =>
                         $r->where('nama_kelas', 'like', $search)
-                    )->orWhereHas('tahunAjaran', fn ($r) =>
+                    )->orWhereHas(
+                        'tahunAjaran',
+                        fn($r) =>
                         $r->where('nama', 'like', $search)
                     );
                 });
@@ -222,25 +256,29 @@ class PenugasanGuruManager extends Component
 
         return view('livewire.admin.penugasan-guru.penugasan-guru-manager', [
             'penugasans' => $penugasans,
-            'gurus' => Guru::where('sekolah_id', $sekolahId)
+            'gurus' => $this->showForm
+                ? Guru::where('sekolah_id', $sekolahId)
                 ->where('status', 'aktif')
                 ->orderBy('nama_lengkap')
-                ->get(),
-            'mataPelajarans' => MataPelajaran::where('sekolah_id', $sekolahId)
+                ->get()
+                : collect(),
+            'mataPelajarans' => $this->showForm
+                ? MataPelajaran::where('sekolah_id', $sekolahId)
                 ->where('is_active', true)
                 ->orderBy('nama')
-                ->get(),
-            'tahunAjarans' => TahunAjaran::where('sekolah_id', $sekolahId)
+                ->get()
+                : collect(),
+            'tahunAjarans' => $this->showForm
+                ? TahunAjaran::where('sekolah_id', $sekolahId)
                 ->orderByDesc('tanggal_mulai')
-                ->get(),
-            'kelasOptions' => Kelas::where('sekolah_id', $sekolahId)
-                ->when(
-                    $this->tahun_ajaran_id,
-                    fn ($q) => $q->where('tahun_ajaran_id', $this->tahun_ajaran_id),
-                    fn ($q) => $q->whereRaw('1 = 0')
-                )
+                ->get()
+                : collect(),
+            'kelasOptions' => $this->showForm && $this->tahun_ajaran_id
+                ? Kelas::where('sekolah_id', $sekolahId)
+                ->where('tahun_ajaran_id', $this->tahun_ajaran_id)
                 ->orderBy('nama_kelas')
-                ->get(),
+                ->get()
+                : collect(),
             'totalPenugasan' => $this->queryPenugasan()->count(),
             'penugasanAktif' => $this->queryPenugasan()
                 ->where('is_active', true)

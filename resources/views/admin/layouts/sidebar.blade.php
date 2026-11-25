@@ -39,6 +39,7 @@ $sections = [
 ['label' => 'Guru', 'icon' => 'fa-chalkboard-user', 'route' => 'guru', 'pattern' => 'admin/guru*'],
 ['label' => 'Pengguna Role', 'icon' => 'fa-user-gear', 'route' => 'pengguna', 'pattern' => 'admin/pengguna*'],
 ['label' => 'Penempatan Siswa', 'icon' => 'fa-people-arrows', 'route' => 'penempatan', 'pattern' => 'admin/penempatan*'],
+['label' => 'Penugasan Guru', 'icon' => 'fa-people-arrows', 'route' => 'penugasanguru', 'pattern' => 'admin/penugasanguru*'],
 ],
 ],
 [
@@ -49,7 +50,7 @@ $sections = [
 ['label' => 'Jurusan', 'icon' => 'fa-sitemap', 'route' => 'jurusan', 'pattern' => 'admin/jurusan*'],
 ['label' => 'Kelas', 'icon' => 'fa-door-open', 'route' => 'kelas', 'pattern' => 'admin/kelas*'],
 ['label' => 'Mata Pelajaran', 'icon' => 'fa-book', 'route' => 'mapel', 'pattern' => 'admin/mapel*'],
-['label' => 'Penugasan Guru', 'icon' => 'fa-people-arrows', 'route' => 'penugasanguru', 'pattern' => 'admin/penugasanguru*'],
+['label' => 'Jadwal Pelajaran', 'icon' => 'fa-people-arrows', 'route' => 'jadwal', 'pattern' => 'admin/jadwal*'],
 ],
 ],
 [

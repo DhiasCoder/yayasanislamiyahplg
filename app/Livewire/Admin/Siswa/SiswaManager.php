@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Siswa;
 
 use App\Models\Siswa;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -79,21 +80,21 @@ class SiswaManager extends Component
     {
         $this->selected = $value
             ? $this->siswaQuery()
-                ->where(function ($query) {
-                    $search = trim($this->search);
+            ->where(function ($query) {
+                $search = trim($this->search);
 
-                    if ($search !== '') {
-                        $query->where('nama_lengkap', 'like', "%{$search}%")
-                            ->orWhere('nis', 'like', "%{$search}%")
-                            ->orWhere('nisn', 'like', "%{$search}%")
-                            ->orWhere('nik', 'like', "%{$search}%");
-                    }
-                })
-                ->latest()
-                ->paginate(10)
-                ->pluck('id')
-                ->map(fn ($id) => (string) $id)
-                ->toArray()
+                if ($search !== '') {
+                    $query->where('nama_lengkap', 'like', "%{$search}%")
+                        ->orWhere('nis', 'like', "%{$search}%")
+                        ->orWhere('nisn', 'like', "%{$search}%")
+                        ->orWhere('nik', 'like', "%{$search}%");
+                }
+            })
+            ->latest()
+            ->paginate(10)
+            ->pluck('id')
+            ->map(fn($id) => (string) $id)
+            ->toArray()
             : [];
     }
 
@@ -154,7 +155,9 @@ class SiswaManager extends Component
         $this->nik = $siswa->nik ?? '';
         $this->jenis_kelamin = $siswa->jenis_kelamin ?? '';
         $this->tempat_lahir = $siswa->tempat_lahir ?? '';
-        $this->tanggal_lahir = $siswa->tanggal_lahir?->format('Y-m-d') ?? '';
+        $this->tanggal_lahir = $siswa->tanggal_lahir
+            ? Carbon::parse($siswa->tanggal_lahir)->format('Y-m-d')
+            : '';
         $this->alamat = $siswa->alamat ?? '';
         $this->agama = $siswa->agama ?? '';
         $this->no_hp = $siswa->no_hp ?? '';
@@ -346,6 +349,6 @@ class SiswaManager extends Component
         return view('livewire.admin.siswa.siswa-manager', [
             'siswas' => $siswas,
         ])->layout('admin.layouts.app')
-          ->title('Manajemen Siswa');
+            ->title('Manajemen Siswa');
     }
 }

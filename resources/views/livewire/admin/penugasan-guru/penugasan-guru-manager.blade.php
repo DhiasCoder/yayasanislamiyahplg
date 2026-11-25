@@ -1,5 +1,20 @@
 {{-- Livewire: elemen root harus satu --}}
-<div class="space-y-6">
+<div class="space-y-6"
+    x-data="{
+        deleteModalOpen: false,
+        deleteId: null,
+        deleteSummary: '',
+        openDelete(id, summary) {
+            this.deleteId = id;
+            this.deleteSummary = summary;
+            this.deleteModalOpen = true;
+        },
+        closeDelete() {
+            this.deleteModalOpen = false;
+            this.deleteId = null;
+            this.deleteSummary = '';
+        }
+    }">
 
     {{-- ================= HEADER ================= --}}
     <section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-500 to-brand-600 p-6 text-white shadow-lg shadow-brand-500/20 sm:p-8">
@@ -19,9 +34,13 @@
                 </span>
             </div>
 
-            <button type="button" wire:click="create"
-                class="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-2xl bg-white px-5 py-3 text-sm font-bold text-brand-700 shadow-md transition hover:bg-brand-50 active:scale-[0.99] sm:self-auto">
-                <i class="fa-solid fa-plus text-xs"></i>
+            <button type="button"
+                wire:click="create"
+                wire:loading.attr="disabled"
+                wire:target="create"
+                class="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-2xl bg-white px-5 py-3 text-sm font-bold text-brand-700 shadow-md transition hover:bg-brand-50 active:scale-[0.99] disabled:opacity-70 sm:self-auto">
+                <i wire:loading.remove wire:target="create" class="fa-solid fa-plus text-xs"></i>
+                <i wire:loading wire:target="create" class="fa-solid fa-circle-notch fa-spin text-xs"></i>
                 Tambah Penugasan
             </button>
         </div>
@@ -99,8 +118,8 @@
         </div>
     </div>
 
-    {{-- ================= TABEL PENUGASAN GURU ================= --}}
-    <div class="overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-sm">
+    {{-- ================= TABEL DESKTOP ================= --}}
+    <div class="hidden overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-sm md:block">
         <div class="overflow-x-auto">
             <table class="w-full min-w-[920px] text-left text-sm">
                 <thead class="bg-brand-50 text-xs uppercase tracking-wide text-brand-700">
@@ -117,6 +136,11 @@
 
                 <tbody class="divide-y divide-brand-50">
                     @forelse ($penugasans as $item)
+                    @php
+                    $ringkasanHapus = ($item->guru?->nama_lengkap ?? '-')
+                    . ' — ' . ($item->mataPelajaran?->nama ?? '-')
+                    . ' (' . ($item->kelas?->nama_kelas ?? '-') . ')';
+                    @endphp
                     <tr wire:key="penugasan-{{ $item->id }}" class="transition hover:bg-brand-50/40">
                         <td class="whitespace-nowrap px-5 py-4 text-slate-400">
                             {{ $penugasans->firstItem() + $loop->index }}
@@ -172,15 +196,20 @@
                             <div class="flex items-center justify-end gap-2">
                                 <button type="button"
                                     wire:click="edit({{ $item->id }})"
-                                    class="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-50">
-                                    <i class="fa-solid fa-pen-to-square text-[11px]"></i>
+                                    wire:loading.attr="disabled"
+                                    wire:target="edit({{ $item->id }})"
+                                    class="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:opacity-60">
+                                    <i wire:loading.remove wire:target="edit({{ $item->id }})" class="fa-solid fa-pen-to-square text-[11px]"></i>
+                                    <i wire:loading wire:target="edit({{ $item->id }})" class="fa-solid fa-circle-notch fa-spin text-[11px]"></i>
                                     Edit
                                 </button>
 
                                 <button type="button"
                                     wire:click="toggleStatus({{ $item->id }})"
                                     wire:confirm="Ubah status penugasan ini?"
-                                    @class([ 'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition' , 'border-amber-200 bg-amber-50/70 text-amber-700 hover:bg-amber-100'=> $item->is_active,
+                                    wire:loading.attr="disabled"
+                                    wire:target="toggleStatus({{ $item->id }})"
+                                    @class([ 'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60' , 'border-amber-200 bg-amber-50/70 text-amber-700 hover:bg-amber-100'=> $item->is_active,
                                     'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100' => !$item->is_active,
                                     ])>
                                     <i class="fa-solid {{ $item->is_active ? 'fa-ban' : 'fa-check' }} text-[11px]"></i>
@@ -188,8 +217,7 @@
                                 </button>
 
                                 <button type="button"
-                                    wire:click="delete({{ $item->id }})"
-                                    wire:confirm="Yakin ingin menghapus penugasan ini?"
+                                    @click="openDelete({{ $item->id }}, @js($ringkasanHapus))"
                                     class="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50">
                                     <i class="fa-solid fa-trash-can text-[11px]"></i>
                                     Hapus
@@ -211,6 +239,82 @@
                 </tbody>
             </table>
         </div>
+    </div>
+
+    {{-- ================= KARTU MOBILE ================= --}}
+    <div class="space-y-3 md:hidden">
+        @forelse ($penugasans as $item)
+        @php
+        $ringkasanHapus = ($item->guru?->nama_lengkap ?? '-')
+        . ' — ' . ($item->mataPelajaran?->nama ?? '-')
+        . ' (' . ($item->kelas?->nama_kelas ?? '-') . ')';
+        @endphp
+        <div wire:key="penugasan-mobile-{{ $item->id }}"
+            class="rounded-2xl border border-brand-100 bg-white p-4 shadow-sm transition hover:border-brand-200">
+            <div class="flex items-start justify-between gap-2">
+                <div class="flex items-center gap-3">
+                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-extrabold text-brand-700">
+                        {{ strtoupper(mb_substr($item->guru?->nama_lengkap ?? 'G', 0, 1)) }}
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-extrabold text-slate-800">{{ $item->guru?->nama_lengkap ?? '-' }}</h3>
+                        <p class="text-xs font-medium text-brand-700">{{ $item->mataPelajaran?->nama ?? '-' }}</p>
+                    </div>
+                </div>
+
+                @if ($item->is_active)
+                <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700">
+                    <span class="h-1.5 w-1.5 rounded-full bg-brand-600"></span>
+                    Aktif
+                </span>
+                @else
+                <span class="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                    Tidak Aktif
+                </span>
+                @endif
+            </div>
+
+            <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                <span class="rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-0.5 font-bold text-brand-700">
+                    {{ $item->kelas?->nama_kelas ?? '-' }}
+                </span>
+                <span class="text-slate-300">·</span>
+                <span>{{ $item->tahunAjaran?->nama ?? '-' }}</span>
+            </div>
+
+            <div class="mt-4 flex gap-2 border-t border-brand-50 pt-3">
+                <button type="button"
+                    wire:click="edit({{ $item->id }})"
+                    class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50/50 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-100">
+                    <i class="fa-solid fa-pen-to-square text-[11px]"></i>
+                    Edit
+                </button>
+
+                <button type="button"
+                    wire:click="toggleStatus({{ $item->id }})"
+                    wire:confirm="Ubah status penugasan ini?"
+                    class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50/60 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100">
+                    <i class="fa-solid {{ $item->is_active ? 'fa-ban' : 'fa-check' }} text-[11px]"></i>
+                    {{ $item->is_active ? 'Nonaktif' : 'Aktifkan' }}
+                </button>
+
+                <button type="button"
+                    @click="openDelete({{ $item->id }}, @js($ringkasanHapus))"
+                    class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50/50 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100">
+                    <i class="fa-solid fa-trash-can text-[11px]"></i>
+                    Hapus
+                </button>
+            </div>
+        </div>
+        @empty
+        <div class="rounded-2xl border border-dashed border-brand-200 bg-white/70 px-6 py-14 text-center">
+            <span class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand-100 text-2xl text-brand-500">
+                <i class="fa-solid fa-chalkboard-user"></i>
+            </span>
+            <p class="mt-4 font-bold text-brand-900">Belum ada data penugasan guru</p>
+            <p class="mt-1 text-sm text-slate-500">Klik tombol "Tambah Penugasan" untuk menetapkan guru ke mata pelajaran dan kelas.</p>
+        </div>
+        @endforelse
     </div>
 
     <div>{{ $penugasans->links() }}</div>
@@ -378,5 +482,87 @@
         </div>
     </div>
     @endif
+
+    {{-- ================= MODAL KONFIRMASI HAPUS (INSTAN) ================= --}}
+    <div x-show="deleteModalOpen"
+        x-cloak
+        x-on:keydown.escape.window="if (deleteModalOpen) closeDelete()"
+        class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4"
+        role="dialog" aria-modal="true">
+
+        <div x-show="deleteModalOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            @click="closeDelete()"
+            class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
+
+        <div x-show="deleteModalOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="translate-y-4 opacity-0 sm:scale-95"
+            x-transition:enter-end="translate-y-0 opacity-100 sm:scale-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="translate-y-0 opacity-100 sm:scale-100"
+            x-transition:leave-end="translate-y-4 opacity-0 sm:scale-95"
+            @click.stop
+            class="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+
+            <div class="flex items-center justify-between gap-3 bg-gradient-to-br from-red-500 to-red-600 px-6 py-5 text-white">
+                <div class="flex items-center gap-3.5">
+                    <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-lg font-extrabold text-red-600 shadow-md">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </span>
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-white/80">Konfirmasi Hapus</p>
+                        <h2 class="text-lg font-extrabold">Hapus Penugasan Guru?</h2>
+                    </div>
+                </div>
+
+                <button type="button" @click="closeDelete()" aria-label="Tutup"
+                    class="grid h-9 w-9 place-items-center rounded-lg text-white/80 transition hover:bg-white/15 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 p-6">
+                <p class="text-sm leading-relaxed text-slate-600">
+                    Apakah Anda yakin ingin menghapus penugasan berikut?
+                </p>
+
+                <div class="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-800"
+                    x-text="deleteSummary"></div>
+
+                <div class="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    <i class="fa-solid fa-circle-info mt-0.5 text-amber-500"></i>
+                    <p>Penugasan yang sudah memiliki materi, ujian, tugas, nilai, atau jadwal <strong>tidak dapat dihapus</strong>.</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-white px-6 py-4 sm:flex-row sm:justify-end">
+                <button type="button" @click="closeDelete()"
+                    class="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                    Batal
+                </button>
+
+                <button type="button"
+                    @click="$wire.delete(deleteId).then(() => closeDelete())"
+                    wire:loading.attr="disabled"
+                    wire:target="delete"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-500/20 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                    <span wire:loading.remove wire:target="delete" class="inline-flex items-center gap-2">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                        Ya, Hapus
+                    </span>
+                    <span wire:loading wire:target="delete" class="inline-flex items-center gap-2">
+                        <i class="fa-solid fa-circle-notch fa-spin text-xs"></i>
+                        Menghapus...
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
 
 </div>

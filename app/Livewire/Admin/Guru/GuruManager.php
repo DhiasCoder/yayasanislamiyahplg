@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Guru;
 
 use App\Models\Guru;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -17,6 +18,7 @@ class GuruManager extends Component
 
     public $search = '';
     public $showModal = false;
+    public $showDetailModal = false;
     public $showDeleteModal = false;
     public $showBulkDeleteModal = false;
     public $isEdit = false;
@@ -33,6 +35,8 @@ class GuruManager extends Component
     public $no_hp = '';
     public $status = 'aktif';
 
+    public array $detailGuru = [];
+
     public $selected = [];
     public $selectAll = false;
     public $deleteId = null;
@@ -46,7 +50,9 @@ class GuruManager extends Component
         }
 
         return $user->userRoles()
-            ->whereHas('role', fn ($query) =>
+            ->whereHas(
+                'role',
+                fn($query) =>
                 $query->where('nama_role', 'admin')
             )
             ->value('sekolah_id');
@@ -121,7 +127,7 @@ class GuruManager extends Component
             ->latest()
             ->paginate(10)
             ->pluck('id')
-            ->map(fn ($id) => (string) $id)
+            ->map(fn($id) => (string) $id)
             ->toArray();
     }
 
@@ -137,6 +143,50 @@ class GuruManager extends Component
                         ->orWhere('nuptk', 'like', "%{$search}%");
                 });
             });
+    }
+
+    public function showDetail($id): void
+    {
+        $guru = $this->guruQuery()->with('user')->findOrFail($id);
+
+        $this->detailGuru = [
+            'id' => $guru->id,
+            'nama_lengkap' => $guru->nama_lengkap,
+            'akun_nama' => $guru->user?->name ?? '-',
+            'akun_email' => $guru->user?->email ?? 'Belum terhubung ke akun',
+            'nip' => $guru->nip ?: '-',
+            'nuptk' => $guru->nuptk ?: '-',
+            'jenis_kelamin' => match ($guru->jenis_kelamin) {
+                'L' => 'Laki-laki',
+                'P' => 'Perempuan',
+                default => '-',
+            },
+            'tempat_lahir' => $guru->tempat_lahir ?: '-',
+            'tanggal_lahir' => $guru->tanggal_lahir
+                ? Carbon::parse($guru->tanggal_lahir)->translatedFormat('d F Y')
+                : '-',
+            'no_hp' => $guru->no_hp ?: '-',
+            'alamat' => $guru->alamat ?: '-',
+            'status' => $guru->status,
+        ];
+
+        $this->showDetailModal = true;
+    }
+
+    public function closeDetail(): void
+    {
+        $this->showDetailModal = false;
+        $this->detailGuru = [];
+    }
+
+    public function editFromDetail(): void
+    {
+        $id = $this->detailGuru['id'] ?? null;
+        $this->closeDetail();
+
+        if ($id) {
+            $this->edit($id);
+        }
     }
 
     public function create(): void
@@ -160,7 +210,7 @@ class GuruManager extends Component
         $this->jenis_kelamin = $guru->jenis_kelamin ?? '';
         $this->tempat_lahir = $guru->tempat_lahir ?? '';
         $this->tanggal_lahir = $guru->tanggal_lahir
-            ? \Illuminate\Support\Carbon::parse($guru->tanggal_lahir)->format('Y-m-d')
+            ? Carbon::parse($guru->tanggal_lahir)->format('Y-m-d')
             : '';
         $this->alamat = $guru->alamat ?? '';
         $this->no_hp = $guru->no_hp ?? '';
@@ -181,12 +231,12 @@ class GuruManager extends Component
 
         $validated = $this->validate();
 
-        // Pastikan akun yang dipilih memang memiliki role guru
-        // pada sekolah yang sama.
         $akunValid = User::whereKey($validated['user_id'])
             ->whereHas('userRoles', function ($query) use ($sekolahId) {
                 $query->where('sekolah_id', $sekolahId)
-                    ->whereHas('role', fn ($role) =>
+                    ->whereHas(
+                        'role',
+                        fn($role) =>
                         $role->where('nama_role', 'guru')
                     );
             })
@@ -200,9 +250,10 @@ class GuruManager extends Component
             return;
         }
 
-        // Cegah satu akun dipakai oleh dua profil guru.
         $akunSudahDipakai = Guru::where('user_id', $validated['user_id'])
-            ->when($this->isEdit, fn ($query) =>
+            ->when(
+                $this->isEdit,
+                fn($query) =>
                 $query->where('id', '!=', $this->guruId)
             )
             ->exists();
@@ -251,8 +302,8 @@ class GuruManager extends Component
         return Schema::hasTable('pengajarans')
             && Schema::hasColumn('pengajarans', 'guru_id')
             && DB::table('pengajarans')
-                ->where('guru_id', $guru->id)
-                ->exists();
+            ->where('guru_id', $guru->id)
+            ->exists();
     }
 
     public function delete(): void
@@ -349,32 +400,39 @@ class GuruManager extends Component
 
     public function render()
     {
-        $sekolahId = $this->getSekolahId();
-
-        $akunTerpakai = Guru::query()
-            ->whereNotNull('user_id')
-            ->when($this->isEdit, fn ($query) =>
-                $query->where('id', '!=', $this->guruId)
-            )
-            ->pluck('user_id');
-
         $akunGuru = collect();
 
-        if ($sekolahId) {
-            $akunGuru = User::query()
-                ->whereHas('userRoles', function ($query) use ($sekolahId) {
-                    $query->where('sekolah_id', $sekolahId)
-                        ->whereHas('role', fn ($role) =>
-                            $role->where('nama_role', 'guru')
-                        );
-                })
-                ->whereNotIn('id', $akunTerpakai)
-                ->orderBy('name')
-                ->get(['id', 'name', 'email']);
+        if ($this->showModal) {
+            $sekolahId = $this->getSekolahId();
+
+            if ($sekolahId) {
+                $akunTerpakai = Guru::query()
+                    ->whereNotNull('user_id')
+                    ->when(
+                        $this->isEdit,
+                        fn($query) =>
+                        $query->where('id', '!=', $this->guruId)
+                    )
+                    ->pluck('user_id');
+
+                $akunGuru = User::query()
+                    ->whereHas('userRoles', function ($query) use ($sekolahId) {
+                        $query->where('sekolah_id', $sekolahId)
+                            ->whereHas(
+                                'role',
+                                fn($role) =>
+                                $role->where('nama_role', 'guru')
+                            );
+                    })
+                    ->whereNotIn('id', $akunTerpakai)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email']);
+            }
         }
 
         return view('livewire.admin.guru.guru-manager', [
             'gurus' => $this->filteredGuruQuery()
+                ->with('user')
                 ->latest()
                 ->paginate(10),
             'akunGuru' => $akunGuru,
