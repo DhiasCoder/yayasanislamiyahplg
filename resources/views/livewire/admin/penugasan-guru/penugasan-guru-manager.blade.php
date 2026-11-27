@@ -1,3 +1,8 @@
+@php
+// Kelompokkan item di halaman aktif berdasarkan Guru agar tidak tampil berulang
+$groupedByGuru = $groups->getCollection()->groupBy(fn ($g) => $g->guru_id ?? 0);
+@endphp
+
 {{-- Livewire: elemen root harus satu --}}
 <div class="space-y-6"
     x-data="{
@@ -81,284 +86,224 @@
     </div>
     @endif
 
-    {{-- ================= STATISTIK ================= --}}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div class="flex items-center gap-4 rounded-2xl border border-brand-100 bg-white p-5 shadow-sm">
+    {{-- ================= STATISTIK & PENCARIAN SEJAJAR ================= --}}
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div class="flex items-center gap-4 rounded-2xl border border-brand-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-3">
             <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-100 text-lg text-brand-600">
                 <i class="fa-solid fa-clipboard-list"></i>
             </span>
             <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Total Penugasan Kelas</p>
-                <p class="mt-0.5 text-2xl font-extrabold text-slate-800">
-                    {{ $totalPenugasan }}
-                </p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Total Kelas</p>
+                <p class="mt-0.5 text-2xl font-extrabold text-slate-800">{{ $totalPenugasan }}</p>
             </div>
         </div>
 
-        <div class="flex items-center gap-4 rounded-2xl border border-brand-100 bg-white p-5 shadow-sm">
+        <div class="flex items-center gap-4 rounded-2xl border border-brand-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-3">
             <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-100 text-lg text-brand-600">
                 <i class="fa-solid fa-circle-check"></i>
             </span>
             <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Penugasan Aktif</p>
-                <p class="mt-0.5 text-2xl font-extrabold text-brand-600">
-                    {{ $penugasanAktif }}
-                </p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Aktif</p>
+                <p class="mt-0.5 text-2xl font-extrabold text-brand-600">{{ $penugasanAktif }}</p>
+            </div>
+        </div>
+
+        <div class="flex items-center rounded-2xl border border-brand-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-6">
+            <div class="relative w-full">
+                <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-brand-400"></i>
+
+                <input type="text"
+                    wire:model.live.debounce.300ms="search"
+                    placeholder="Cari nama guru, mata pelajaran, kelas, atau tahun ajaran..."
+                    class="w-full rounded-xl border border-brand-100 bg-brand-50/50 py-3 pl-11 pr-11 text-sm text-slate-700 outline-none transition
+                           placeholder:text-slate-400 focus:border-brand-300 focus:bg-white focus:ring-2 focus:ring-brand-200">
+
+                @if (trim($search) !== '')
+                <button type="button"
+                    wire:click="$set('search', '')"
+                    wire:loading.remove
+                    wire:target="search"
+                    aria-label="Hapus pencarian"
+                    class="absolute right-3.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-slate-200/70 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+                @endif
+
+                <i wire:loading wire:target="search"
+                    class="fa-solid fa-circle-notch fa-spin absolute right-4 top-1/2 -translate-y-1/2 text-sm text-brand-500"></i>
             </div>
         </div>
     </div>
 
-    {{-- ================= FILTER PENCARIAN ================= --}}
-    <div class="rounded-2xl border border-brand-100 bg-white p-4 shadow-sm sm:p-5">
-        <div class="relative sm:max-w-md">
-            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-sm text-brand-400"></i>
+    {{-- ================= DAFTAR PENUGASAN DIKELOMPOKKAN PER GURU ================= --}}
+    <div class="space-y-4">
+        @forelse ($groupedByGuru as $guruId => $mapelGroups)
+        @php
+        $guruObj = $mapelGroups->first()?->guru;
+        $namaGuru = $guruObj?->nama_lengkap ?? 'Guru Tidak Diketahui';
+        $totalMapel = $mapelGroups->count();
+        $totalKelas = $mapelGroups->sum(fn ($g) => $g->kelasItems->count());
+        @endphp
 
-            <input type="text"
-                wire:model.live.debounce.300ms="search"
-                placeholder="Cari guru, mata pelajaran, atau kelas..."
-                class="w-full rounded-xl border border-brand-100 bg-brand-50/50 py-3 pl-11 pr-11 text-sm outline-none transition
-                       placeholder:text-slate-400 focus:border-brand-300 focus:bg-white focus:ring-2 focus:ring-brand-200">
+        <section wire:key="guru-card-{{ $guruId }}"
+            class="overflow-hidden rounded-3xl border border-brand-100 bg-white shadow-sm transition hover:border-brand-200">
 
-            <i wire:loading wire:target="search"
-                class="fa-solid fa-circle-notch fa-spin absolute right-4 top-1/2 -translate-y-1/2 text-sm text-brand-500"></i>
-        </div>
-    </div>
+            {{-- Header Kartu Guru --}}
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-100/80 bg-gradient-to-r from-brand-50/80 via-brand-50/30 to-white px-5 py-4 sm:px-6">
+                <div class="flex items-center gap-3.5">
+                    <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-600 text-base font-extrabold text-white shadow-sm shadow-brand-500/20">
+                        {{ strtoupper(mb_substr($namaGuru, 0, 1)) }}
+                    </span>
+                    <div>
+                        <h2 class="text-base font-extrabold text-slate-800 sm:text-lg">
+                            {{ $namaGuru }}
+                        </h2>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Mengampu <strong class="text-brand-700">{{ $totalMapel }}</strong> mata pelajaran di <strong class="text-brand-700">{{ $totalKelas }}</strong> kelas
+                        </p>
+                    </div>
+                </div>
 
-    {{-- ================= TABEL DESKTOP ================= --}}
-    <div class="hidden overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-sm md:block">
-        <div class="overflow-x-auto">
-            <table class="w-full min-w-[960px] text-left text-sm">
-                <thead class="bg-brand-50 text-xs uppercase tracking-wide text-brand-700">
-                    <tr>
-                        <th class="w-14 px-5 py-3.5">No</th>
-                        <th class="px-5 py-3.5">Guru</th>
-                        <th class="px-5 py-3.5">Mata Pelajaran</th>
-                        <th class="px-5 py-3.5">Kelas yang Diajar</th>
-                        <th class="px-5 py-3.5">Tahun Ajaran</th>
-                        <th class="px-5 py-3.5 text-center">Status</th>
-                        <th class="px-5 py-3.5 text-right">Aksi</th>
-                    </tr>
-                </thead>
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-bold text-brand-700">
+                    <i class="fa-solid fa-layer-group text-[11px] text-brand-500"></i>
+                    {{ $totalKelas }} Kelas
+                </span>
+            </div>
 
-                <tbody class="divide-y divide-brand-50">
-                    @forelse ($groups as $group)
-                    @php
-                    $daftarKelasTeks = $group->kelasItems
-                    ->map(fn ($i) => $i->kelas?->nama_kelas ?? '-')
-                    ->implode(', ');
+            {{-- Daftar Mata Pelajaran & Kelas yang Diajar Guru Ini --}}
+            <div class="divide-y divide-slate-100">
+                @foreach ($mapelGroups as $group)
+                @php
+                $daftarKelasTeks = $group->kelasItems
+                ->map(fn ($i) => $i->kelas?->nama_kelas ?? '-')
+                ->implode(', ');
 
-                    $ringkasanHapus = ($group->guru?->nama_lengkap ?? '-')
-                    . ' — ' . ($group->mataPelajaran?->nama ?? '-')
-                    . ' (Kelas: ' . $daftarKelasTeks . ')';
+                $ringkasanHapus = $namaGuru
+                . ' — ' . ($group->mataPelajaran?->nama ?? '-')
+                . ' (Kelas: ' . $daftarKelasTeks . ')';
 
-                    $groupKey = "{$group->guru_id}-{$group->mata_pelajaran_id}-{$group->tahun_ajaran_id}";
-                    @endphp
+                $groupKey = "{$group->guru_id}-{$group->mata_pelajaran_id}-{$group->tahun_ajaran_id}";
+                @endphp
 
-                    <tr wire:key="group-{{ $groupKey }}" class="transition hover:bg-brand-50/40">
-                        <td class="whitespace-nowrap px-5 py-4 text-slate-400">
-                            {{ $groups->firstItem() + $loop->index }}
-                        </td>
+                <div wire:key="group-row-{{ $groupKey }}"
+                    class="flex flex-col justify-between gap-4 p-5 transition hover:bg-brand-50/25 lg:flex-row lg:items-center sm:px-6">
 
-                        <td class="whitespace-nowrap px-5 py-4">
-                            @if ($group->guru)
-                            <div class="flex items-center gap-3">
-                                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-extrabold text-brand-700">
-                                    {{ strtoupper(mb_substr($group->guru->nama_lengkap, 0, 1)) }}
-                                </span>
-                                <span class="font-semibold text-slate-800">
-                                    {{ $group->guru->nama_lengkap }}
-                                </span>
-                            </div>
-                            @else
-                            <span class="text-slate-400">-</span>
-                            @endif
-                        </td>
+                    {{-- Kiri: Info Mapel + Tahun + Badge Kelas --}}
+                    <div class="min-w-0 flex-1 space-y-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-brand-100 text-xs text-brand-700">
+                                <i class="fa-solid fa-book-open"></i>
+                            </span>
 
-                        <td class="whitespace-nowrap px-5 py-4 font-medium text-slate-700">
-                            {{ $group->mataPelajaran?->nama ?? '-' }}
-                        </td>
+                            <h3 class="text-sm font-extrabold text-slate-800 sm:text-base">
+                                {{ $group->mataPelajaran?->nama ?? '-' }}
+                            </h3>
 
-                        <td class="px-5 py-4">
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                @foreach ($group->kelasItems as $itemKelas)
-                                <span class="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-bold {{ $itemKelas->is_active ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-slate-200 bg-slate-100 text-slate-500' }}">
-                                    {{ $itemKelas->kelas?->nama_kelas ?? '-' }}
-                                </span>
-                                @endforeach
+                            <span class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                                <i class="fa-regular fa-calendar text-[11px] text-slate-400"></i>
+                                {{ $group->tahunAjaran?->nama ?? '-' }}
+                            </span>
 
-                                <button type="button"
-                                    wire:click="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
-                                    title="Tambah atau ubah kelas yang diajar"
-                                    class="inline-flex items-center gap-1 rounded-lg border border-dashed border-brand-300 bg-white px-2.5 py-1 text-xs font-semibold text-brand-600 transition hover:border-brand-400 hover:bg-brand-50 disabled:opacity-60">
-                                    <i wire:loading.remove wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})" class="fa-solid fa-plus text-[10px]"></i>
-                                    <i wire:loading wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})" class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
-                                    Atur Kelas
-                                </button>
-                            </div>
-                        </td>
-
-                        <td class="whitespace-nowrap px-5 py-4 text-slate-600">
-                            {{ $group->tahunAjaran?->nama ?? '-' }}
-                        </td>
-
-                        <td class="whitespace-nowrap px-5 py-4 text-center">
                             @if ($group->is_active)
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-bold text-brand-700">
                                 <span class="h-1.5 w-1.5 rounded-full bg-brand-600"></span>
                                 Aktif
                             </span>
                             @else
-                            <span class="inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
                                 Tidak Aktif
                             </span>
                             @endif
-                        </td>
+                        </div>
 
-                        <td class="whitespace-nowrap px-5 py-4 text-right">
-                            <div class="flex items-center justify-end gap-2">
-                                <button type="button"
-                                    wire:click="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
-                                    class="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:opacity-60">
-                                    <i wire:loading.remove wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})" class="fa-solid fa-pen-to-square text-[11px]"></i>
-                                    <i wire:loading wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})" class="fa-solid fa-circle-notch fa-spin text-[11px]"></i>
-                                    Edit
-                                </button>
-
-                                <button type="button"
-                                    wire:click="toggleGroupStatus({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }}, {{ $group->is_active ? 'false' : 'true' }})"
-                                    wire:confirm="Ubah status penugasan ini?"
-                                    wire:loading.attr="disabled"
-                                    class="inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60 {{ $group->is_active ? 'border-amber-200 bg-amber-50/70 text-amber-700 hover:bg-amber-100' : 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100' }}">
-                                    <i class="fa-solid {{ $group->is_active ? 'fa-ban' : 'fa-check' }} text-[11px]"></i>
-                                    {{ $group->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                                </button>
-
-                                <button type="button"
-                                    @click="openDelete({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }}, @js($ringkasanHapus))"
-                                    class="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50">
-                                    <i class="fa-solid fa-trash-can text-[11px]"></i>
-                                    Hapus
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="7" class="px-6 py-16 text-center">
-                            <span class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand-100 text-2xl text-brand-500">
-                                <i class="fa-solid fa-chalkboard-user"></i>
+                        {{-- Daftar Pill Kelas --}}
+                        <div class="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-10">
+                            <span class="mr-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                Kelas:
                             </span>
-                            <p class="mt-4 font-bold text-brand-900">Belum ada data penugasan guru</p>
-                            <p class="mt-1 text-sm text-slate-500">Klik tombol "Tambah Penugasan" untuk menetapkan guru ke mata pelajaran dan kelas.</p>
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
 
-    {{-- ================= KARTU MOBILE ================= --}}
-    <div class="space-y-3 md:hidden">
-        @forelse ($groups as $group)
-        @php
-        $daftarKelasTeks = $group->kelasItems
-        ->map(fn ($i) => $i->kelas?->nama_kelas ?? '-')
-        ->implode(', ');
+                            @foreach ($group->kelasItems as $itemKelas)
+                            <span @class([ 'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-bold' , 'border-brand-200 bg-brand-50 text-brand-700'=> $itemKelas->is_active,
+                                'border-slate-200 bg-slate-100 text-slate-500' => ! $itemKelas->is_active,
+                                ])>
+                                <i class="fa-solid fa-door-open text-[10px] opacity-70"></i>
+                                {{ $itemKelas->kelas?->nama_kelas ?? '-' }}
+                            </span>
+                            @endforeach
 
-        $ringkasanHapus = ($group->guru?->nama_lengkap ?? '-')
-        . ' — ' . ($group->mataPelajaran?->nama ?? '-')
-        . ' (Kelas: ' . $daftarKelasTeks . ')';
+                            <button type="button"
+                                wire:click="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
+                                wire:loading.attr="disabled"
+                                wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
+                                class="inline-flex items-center gap-1 rounded-lg border border-dashed border-brand-300 bg-white px-2.5 py-1 text-xs font-semibold text-brand-600 transition hover:border-brand-400 hover:bg-brand-50 disabled:opacity-60">
+                                <i wire:loading.remove wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})" class="fa-solid fa-plus text-[10px]"></i>
+                                <i wire:loading wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})" class="fa-solid fa-circle-notch fa-spin text-[10px]"></i>
+                                Atur Kelas
+                            </button>
+                        </div>
+                    </div>
 
-        $groupKey = "{$group->guru_id}-{$group->mata_pelajaran_id}-{$group->tahun_ajaran_id}";
-        @endphp
+                    {{-- Kanan: Tombol Aksi --}}
+                    <div class="flex shrink-0 items-center gap-2 border-t border-slate-100 pt-3 lg:border-t-0 lg:pt-0">
+                        <button type="button"
+                            wire:click="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
+                            wire:loading.attr="disabled"
+                            wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
+                            class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-brand-200 bg-white px-3.5 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:opacity-60 lg:flex-initial">
+                            <i wire:loading.remove wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})" class="fa-solid fa-sliders text-[11px]"></i>
+                            <i wire:loading wire:target="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})" class="fa-solid fa-circle-notch fa-spin text-[11px]"></i>
+                            Atur Kelas
+                        </button>
 
-        <div wire:key="group-mobile-{{ $groupKey }}"
-            class="rounded-2xl border border-brand-100 bg-white p-4 shadow-sm transition hover:border-brand-200">
-            <div class="flex items-start justify-between gap-2">
-                <div class="flex items-center gap-3">
-                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-extrabold text-brand-700">
-                        {{ strtoupper(mb_substr($group->guru?->nama_lengkap ?? 'G', 0, 1)) }}
-                    </span>
-                    <div>
-                        <h3 class="text-sm font-extrabold text-slate-800">{{ $group->guru?->nama_lengkap ?? '-' }}</h3>
-                        <p class="text-xs font-medium text-brand-700">{{ $group->mataPelajaran?->nama ?? '-' }}</p>
+                        <button type="button"
+                            wire:click="toggleGroupStatus({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }}, {{ $group->is_active ? 'false' : 'true' }})"
+                            wire:confirm="Ubah status penugasan ini?"
+                            wire:loading.attr="disabled"
+                            @class([ 'inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition disabled:opacity-60 lg:flex-initial' , 'border-amber-200 bg-amber-50/70 text-amber-700 hover:bg-amber-100'=> $group->is_active,
+                            'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100' => ! $group->is_active,
+                            ])>
+                            <i class="fa-solid {{ $group->is_active ? 'fa-ban' : 'fa-check' }} text-[11px]"></i>
+                            {{ $group->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                        </button>
+
+                        <button type="button"
+                            @click="openDelete({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }}, @js($ringkasanHapus))"
+                            title="Hapus penugasan mata pelajaran ini"
+                            aria-label="Hapus penugasan"
+                            class="inline-flex items-center justify-center rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
                     </div>
                 </div>
-
-                @if ($group->is_active)
-                <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700">
-                    <span class="h-1.5 w-1.5 rounded-full bg-brand-600"></span>
-                    Aktif
-                </span>
-                @else
-                <span class="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                    Tidak Aktif
-                </span>
-                @endif
-            </div>
-
-            <div class="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-                @foreach ($group->kelasItems as $itemKelas)
-                <span class="rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-0.5 font-bold text-brand-700">
-                    {{ $itemKelas->kelas?->nama_kelas ?? '-' }}
-                </span>
                 @endforeach
-
-                <button type="button"
-                    wire:click="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
-                    class="inline-flex items-center gap-1 rounded-lg border border-dashed border-brand-300 bg-white px-2 py-0.5 font-semibold text-brand-600">
-                    <i class="fa-solid fa-plus text-[10px]"></i> Atur Kelas
-                </button>
             </div>
-
-            <p class="mt-2 text-xs text-slate-500">
-                Tahun Ajaran: <span class="font-medium text-slate-700">{{ $group->tahunAjaran?->nama ?? '-' }}</span>
-            </p>
-
-            <div class="mt-4 flex gap-2 border-t border-brand-50 pt-3">
-                <button type="button"
-                    wire:click="editGroup({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }})"
-                    class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50/50 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-100">
-                    <i class="fa-solid fa-pen-to-square text-[11px]"></i>
-                    Atur Kelas
-                </button>
-
-                <button type="button"
-                    wire:click="toggleGroupStatus({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }}, {{ $group->is_active ? 'false' : 'true' }})"
-                    wire:confirm="Ubah status penugasan ini?"
-                    class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50/60 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100">
-                    <i class="fa-solid {{ $group->is_active ? 'fa-ban' : 'fa-check' }} text-[11px]"></i>
-                    {{ $group->is_active ? 'Nonaktif' : 'Aktifkan' }}
-                </button>
-
-                <button type="button"
-                    @click="openDelete({{ $group->guru_id }}, {{ $group->mata_pelajaran_id }}, {{ $group->tahun_ajaran_id }}, @js($ringkasanHapus))"
-                    class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50/50 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100">
-                    <i class="fa-solid fa-trash-can text-[11px]"></i>
-                    Hapus
-                </button>
-            </div>
-        </div>
+        </section>
         @empty
-        <div class="rounded-2xl border border-dashed border-brand-200 bg-white/70 px-6 py-14 text-center">
+        <div class="rounded-3xl border border-dashed border-brand-200 bg-white px-6 py-16 text-center shadow-sm">
             <span class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand-100 text-2xl text-brand-500">
                 <i class="fa-solid fa-chalkboard-user"></i>
             </span>
-            <p class="mt-4 font-bold text-brand-900">Belum ada data penugasan guru</p>
-            <p class="mt-1 text-sm text-slate-500">Klik tombol "Tambah Penugasan" untuk menetapkan guru ke mata pelajaran dan kelas.</p>
+            <p class="mt-4 font-bold text-brand-900">
+                {{ trim($search) !== '' ? 'Penugasan guru tidak ditemukan' : 'Belum ada data penugasan guru' }}
+            </p>
+            <p class="mt-1 text-sm text-slate-500">
+                {{ trim($search) !== '' ? 'Coba gunakan kata kunci guru, mata pelajaran, atau kelas lain.' : 'Klik tombol "Tambah Penugasan" untuk menetapkan guru ke mata pelajaran dan kelas.' }}
+            </p>
         </div>
         @endforelse
     </div>
 
+    {{-- ================= PAGINASI ================= --}}
     <div>{{ $groups->links() }}</div>
 
     {{-- ================= MODAL TAMBAH / ATUR KELAS PENUGASAN ================= --}}
     @if ($showForm)
+    @php
+    $selectedGuruObj = $isEditMode ? $gurus->firstWhere('id', (int) $guru_id) : null;
+    $selectedMapelObj = $isEditMode ? $mataPelajarans->firstWhere('id', (int) $mata_pelajaran_id) : null;
+    $selectedTahunObj = $isEditMode ? $tahunAjarans->firstWhere('id', (int) $tahun_ajaran_id) : null;
+    @endphp
+
     <div class="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4"
         x-data="{ show: false }" x-init="$nextTick(() => show = true)"
         x-on:keydown.escape.window="$wire.resetForm()"
@@ -397,13 +342,33 @@
 
                 {{-- Body Form --}}
                 <div class="space-y-4 overflow-y-auto p-6">
+                    @if ($isEditMode)
+                    {{-- Kartu Ringkasan Guru & Mapel saat Mode Atur Kelas --}}
+                    <div class="rounded-2xl border border-brand-200 bg-brand-50/50 p-4">
+                        <div class="flex items-center gap-3">
+                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-600 text-sm font-extrabold text-white">
+                                {{ strtoupper(mb_substr($selectedGuruObj?->nama_lengkap ?? 'G', 0, 1)) }}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-extrabold text-slate-800">
+                                    {{ $selectedGuruObj?->nama_lengkap ?? '-' }}
+                                </p>
+                                <p class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                                    <span class="font-semibold text-brand-700">{{ $selectedMapelObj?->nama ?? '-' }}</span>
+                                    <span class="text-slate-300">·</span>
+                                    <span>{{ $selectedTahunObj?->nama ?? '-' }}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    @else
                     <div>
                         <label class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-brand-700">
                             Tahun Ajaran <span class="text-red-500">*</span>
                         </label>
-                        <select wire:model.live="tahun_ajaran_id" @disabled($isEditMode)
+                        <select wire:model.live="tahun_ajaran_id"
                             class="w-full rounded-xl border border-brand-200 bg-white px-3.5 py-2.5 text-sm text-slate-700 outline-none transition
-                                   focus:border-brand-400 focus:ring-2 focus:ring-brand-200 disabled:bg-slate-50 disabled:text-slate-600">
+                                           focus:border-brand-400 focus:ring-2 focus:ring-brand-200">
                             <option value="">Pilih tahun ajaran</option>
                             @foreach ($tahunAjarans as $tahun)
                             <option value="{{ $tahun->id }}">
@@ -423,9 +388,9 @@
                             <label class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-brand-700">
                                 Guru <span class="text-red-500">*</span>
                             </label>
-                            <select wire:model.live="guru_id" @disabled($isEditMode)
+                            <select wire:model.live="guru_id"
                                 class="w-full rounded-xl border border-brand-200 bg-white px-3.5 py-2.5 text-sm text-slate-700 outline-none transition
-                                       focus:border-brand-400 focus:ring-2 focus:ring-brand-200 disabled:bg-slate-50 disabled:text-slate-600">
+                                               focus:border-brand-400 focus:ring-2 focus:ring-brand-200">
                                 <option value="">Pilih guru</option>
                                 @foreach ($gurus as $guru)
                                 <option value="{{ $guru->id }}">{{ $guru->nama_lengkap }}</option>
@@ -442,9 +407,9 @@
                             <label class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-brand-700">
                                 Mata Pelajaran <span class="text-red-500">*</span>
                             </label>
-                            <select wire:model.live="mata_pelajaran_id" @disabled($isEditMode)
+                            <select wire:model.live="mata_pelajaran_id"
                                 class="w-full rounded-xl border border-brand-200 bg-white px-3.5 py-2.5 text-sm text-slate-700 outline-none transition
-                                       focus:border-brand-400 focus:ring-2 focus:ring-brand-200 disabled:bg-slate-50 disabled:text-slate-600">
+                                               focus:border-brand-400 focus:ring-2 focus:ring-brand-200">
                                 <option value="">Pilih mata pelajaran</option>
                                 @foreach ($mataPelajarans as $mapel)
                                 <option value="{{ $mapel->id }}">{{ $mapel->nama }}</option>
@@ -457,6 +422,7 @@
                             @enderror
                         </div>
                     </div>
+                    @endif
 
                     {{-- PILIHAN TOMBOL MULTI-KELAS --}}
                     <div>

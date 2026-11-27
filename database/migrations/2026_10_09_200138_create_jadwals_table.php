@@ -20,7 +20,7 @@ return new class extends Migration
             $table->time('jam_mulai');
             $table->time('jam_selesai');
 
-            $table->string('ruang')->nullable();
+            $table->boolean('is_active')->default(true);
 
             $table->timestamps();
         });

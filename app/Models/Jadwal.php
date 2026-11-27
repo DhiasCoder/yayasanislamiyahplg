@@ -17,7 +17,11 @@ class Jadwal extends Model
         'hari',
         'jam_mulai',
         'jam_selesai',
-        'ruang',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     public function pengajaran(): BelongsTo
