@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Admin\Ppdb;
 
-use Livewire\Component;
-use Livewire\WithPagination;
+use App\Models\PpdbPendaftar;
+use App\Services\PpdbToSiswaService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Models\PpdbPendaftar;
+use Livewire\Component;
+use Livewire\WithPagination;
+use Throwable;
 
 class DaftarUlangManager extends Component
 {
@@ -69,6 +71,7 @@ class DaftarUlangManager extends Component
 
     public function konfirmasiDaftarUlang($id)
     {
+        $sekolahId = $this->sekolahId();
         $pendaftar = $this->cariPendaftar($id);
 
         if ($pendaftar->status !== 'diterima') {
@@ -76,11 +79,24 @@ class DaftarUlangManager extends Component
             return;
         }
 
-        $pendaftar->update([
-            'status' => 'daftar_ulang',
-        ]);
+        try {
+            $hasil = DB::transaction(function () use ($pendaftar, $sekolahId) {
+                $pendaftar->update([
+                    'status' => 'daftar_ulang',
+                ]);
 
-        session()->flash('success', 'Daftar ulang berhasil dikonfirmasi.');
+                return app(PpdbToSiswaService::class)->convert($pendaftar, $sekolahId);
+            });
+
+            $infoAkun = $hasil['is_new'] && $hasil['default_password']
+                ? " Akun siswa dibuat — Email: {$hasil['generated_email']} | Password: {$hasil['default_password']}"
+                : " Terhubung ke akun siswa: {$hasil['generated_email']}";
+
+            session()->flash('success', 'Daftar ulang berhasil dikonfirmasi.' . $infoAkun);
+        } catch (Throwable $e) {
+            report($e);
+            session()->flash('error', 'Gagal mengonfirmasi daftar ulang: ' . $e->getMessage());
+        }
     }
 
     public function render()
@@ -92,7 +108,7 @@ class DaftarUlangManager extends Component
             ->whereIn('status', ['diterima', 'daftar_ulang'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
-                    $q->where('nama_lengkap', 'like', '\%' . $this->search . '%')
+                    $q->where('nama_lengkap', 'like', '%' . $this->search . '%')
                         ->orWhere('nomor_pendaftaran', 'like', '%' . $this->search . '%');
                 });
             })
